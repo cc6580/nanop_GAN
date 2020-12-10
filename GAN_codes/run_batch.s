@@ -48,7 +48,7 @@ module load cudnn/10.1v7.6.5.32
 # the 1st argument is the start folder
 # the 2nd is the end folder for training images
 # the 3rd is 0 if you want to start a fresh training, 1 if you want to continue where you left off
-# the 4th is the size/length of z latent vector (i.e. size of generator input)
+# the 4th is the size/length of `z` latent vector (i.e. size of generator input)
 # the 5th is the start epoch number from which you'd like to start the continued training, models will be loaded from one prior	epoch
 # the 6th is the learning rate for the G optimizer
 # the 7th is the learning rate for the D optimizer

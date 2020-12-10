@@ -81,7 +81,7 @@ ndf = 64
 num_epochs = 100
 
 # Learning rate for optimizers
-lr = 0.0002
+lr = 0.0001
   # smaller batch number, slightly larger learning rate?
 
 # Beta1 hyperparam for Adam optimizers
@@ -149,23 +149,26 @@ dataset = CustomDataset_crop(folder_data, train=True)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                          shuffle=True, num_workers=workers)
 
-real_batch = next(iter(dataloader))
-  # get 1 batch of samples, which is 64 samples per our defined batch_size
+cont = bool(int(sys.argv[3]))
 
-# Plot some training images
-plt.figure(figsize=(8,8))
-plt.axis("off")
-plt.title("Training Images")
-grid = vutils.make_grid((real_batch[0][:16]), 
-                        # [(real_batch[0].to(device)[i]) for i in range(16)], 
-                        nrow=4,
-                        padding=5, 
-                        normalize=True)
-plt.imshow(grid[1], cmap='gray', vmin=0, vmax=1)
-  # since our grid normalized all images, scale is from 0~1
-plt.savefig("result_figs/training_images")
-plt.close()
-print("generated training images")
+if cont == 0:
+  real_batch = next(iter(dataloader))
+    # get 1 batch of samples, which is 36 samples per our defined batch_size
+
+  # Plot some training images
+  plt.figure(figsize=(8,8))
+  plt.axis("off")
+  plt.title("Training Images")
+  grid = vutils.make_grid((real_batch[0][:16]), 
+                          # [(real_batch[0].to(device)[i]) for i in range(16)], 
+                          nrow=4,
+                          padding=5, 
+                          normalize=True)
+  plt.imshow(grid[1], cmap='gray', vmin=0, vmax=1)
+    # since our grid normalized all images, scale is from 0~1
+  plt.savefig("result_figs/training_images")
+  plt.close()
+  print("generated training images")
 
 # weight initialization ---------------------------------------------------------------------------------------------------------------------------
 
@@ -271,8 +274,6 @@ class Discriminator(nn.Module):
 
 # initialize model and optimizer ---------------------------------------------------------------------------------------------------------------------
 
-cont = bool(int(sys.argv[3]))
-
 if cont == 0:
   print("starting fresh training...")
   # Create the generator
@@ -366,7 +367,9 @@ else:
   D_losses = logs["D_losses"]
   # start_epoch = logs["start_epoch"]
   start_epoch = int(sys.argv[5])
-  img_list = torch.load("img_list.ts")
+  # img_list = torch.load("img_list.ts")
+    # this takes too much RAM, we will load this in later if needed
+  img_list = []
   last_imgs = torch.load("last_imgs.ts")
 
 iters = 1
@@ -526,12 +529,14 @@ for epoch in range(start_epoch, start_epoch+num_epochs):
     torch.save(netD, 'model_checkpoints/e{}_D'.format(epoch))
     print(120*'-')
 
+if cont == 0: last_imgs.append(img_list[0].cpu())
 last_imgs.append(img_list[-1].cpu())
 
 # save the losses and the validation images so we can re-visit them later
-torch.save(img_list, "img_list.ts")
+# torch.save(img_list, "img_list.ts")
+torch.save(img_list, "img_list_e{}~{}.ts".format(start_epoch, start_epoch+num_epochs-1))
 torch.save(last_imgs, "last_imgs.ts")
-  # since this list contains tensors, we cannot save with Json
+  # since these lists contains tensors, we cannot save with Json
 logs["G_losses"] = G_losses
 logs["D_losses"] = D_losses
 # logs["start_epoch"] = epoch+1
@@ -540,13 +545,14 @@ with open(str(sys.argv[8]), 'w') as fp:
 
 print("number of grids saved in G's progression: ", len(img_list))
 
-plt.figure(figsize=(8,8))
-plt.imshow((img_list[0].cpu()), cmap='gray', vmin=0, vmax=1)
-  # grid was normalized from make_grid so value is 0~1
-  # since the images were output of the model on GPU, we have to convert them to host CPU memory for plt to work
-plt.savefig("result_figs/first_gen")
-plt.close()
-print("plotted the first generated image")
+if cont == 0:
+  plt.figure(figsize=(8,8))
+  plt.imshow((img_list[0].cpu()), cmap='gray', vmin=0, vmax=1)
+    # grid was normalized from make_grid so value is 0~1
+    # since the images were output of the model on GPU, we have to convert them to host CPU memory for plt to work
+  plt.savefig("result_figs/first_gen")
+  plt.close()
+  print("plotted the first generated image")
 
 plt.figure(figsize=(8,8))
 plt.imshow((img_list[-1].cpu()), cmap='gray', vmin=0, vmax=1)
@@ -557,12 +563,13 @@ print("plotted the last generated image")
 
 plt.figure(figsize=(8,int(8*len(last_imgs))))
   # width 8, height 8*number of images
-for i in range(1, len(last_imgs)+1):
-  plt.subplot(len(last_imgs), 1, i)
-    # add len(last_imgs) rows and 1 column of subplots, this will be the ith of them
+for i in range(0, len(last_imgs)):
+  plt.subplot(len(last_imgs), 1, i+1)
+    # add len(last_imgs) rows and 1 column of subplots, this will be the i-th subplot of them
+    # the first subplot is indexed 1, not 0!
   plt.axis("off")
   plt.title("image generated after epoch {}".format(i*100))
-  plt.imshow(last_imgs[i-1], cmap='gray', vmin=0, vmax=1)
+  plt.imshow(last_imgs[i], cmap='gray', vmin=0, vmax=1)
 plt.savefig("result_figs/last_imgs")
 plt.close()
 print("plotted the last imgs generated after every 100 epochs")
@@ -606,12 +613,12 @@ print("plotted real vs fake image")
 # Set up formatting for the movie files
 Writer = animation.writers['ffmpeg']
   # `conda install -c conda-forge ffmpeg` on HPC in your environment for this to work
-writer = Writer(fps=20, metadata=dict(artist='Me'), bitrate=1800)
+writer = Writer(fps=10, metadata=dict(artist='Me'), bitrate=1800)
 fig = plt.figure(figsize=(8,8))
 plt.axis("off")
 ims = [[plt.imshow((i.cpu()), animated=True, cmap='gray')] for i in img_list]
 ani = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
-ani.save("result_figs/G_progress.mp4", writer=writer)
+ani.save("result_figs/G_progress_e{}~{}.mp4".format(start_epoch, start_epoch+num_epochs-1), writer=writer)
   # save the animation to a mp4 video file
 plt.close()
 print("plotted generator progression")
