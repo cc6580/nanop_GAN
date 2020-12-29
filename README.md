@@ -1,3 +1,3 @@
 # nanop_GAN
 
-Codes for nanop_GAN denoising project.
+This repository contains the code and report for the project "Image Denoising with Generative Adversarial Networks"
